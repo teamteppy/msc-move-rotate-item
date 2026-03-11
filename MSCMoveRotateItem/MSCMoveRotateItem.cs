@@ -1,5 +1,7 @@
-﻿using MSCLoader;
+﻿using HutongGames.PlayMaker;
+using MSCLoader;
 using UnityEngine;
+
 namespace MSCMoveRotateItem
 {
     public class MSCMoveRotateItem : Mod
@@ -10,11 +12,15 @@ namespace MSCMoveRotateItem
         public override string Version => "1.0";
         public override string Description => "";
         public override Game SupportedGames => Game.MySummerCar;
-        private PlayMakerGlobals globals;
+
         private SettingsKeybind debugKey;
+        private FsmGameObject pickedObject;
+        private PlayMakerFSM pickUpFsm;
+        private Camera fpsCamera;
         private Transform itemPivot;
-        private GameObject heldGO;
-        private float zRotationOffset = 0f;
+
+        private GameObject hijackedGO;
+        private bool shiftHijacked = false;
 
         public override void ModSetup()
         {
@@ -22,40 +28,44 @@ namespace MSCMoveRotateItem
             SetupFunction(Setup.OnGUI, Mod_OnGUI);
             SetupFunction(Setup.Update, Mod_Update);
             SetupFunction(Setup.ModSettings, Mod_Settings);
-
         }
+
         private void LogToFile(string message)
         {
             string path = Application.persistentDataPath + "/MSCPauseMod_debug.txt";
             System.IO.File.AppendAllText(path, message + "\n");
-        }
-        private string GetGameObjectPath(GameObject go)
-        {
-            string path = go.name;
-            Transform t = go.transform.parent;
-            while (t != null)
-            {
-                path = t.name + "/" + path;
-                t = t.parent;
-            }
-            return path;
-        }
-        private void TryFindItemPivot()
-        {
-            if (itemPivot != null) { return; }
-            GameObject player = GameObject.Find("PLAYER");
-            if (player == null) { return; }
-            itemPivot = player.transform.Find("Pivot/AnimPivot/Camera/FPSCamera/1Hand_Assemble/ItemPivot");
         }
 
         private void Mod_Settings()
         {
             debugKey = Keybind.Add("DebugKey", "Debug Game", KeyCode.Alpha9);
         }
+
         private void Mod_OnLoad()
         {
-            globals = PlayMakerGlobals.Instance;
+            fpsCamera = GameObject.Find("FPSCamera").GetComponent<Camera>();
+
+            GameObject player = GameObject.Find("PLAYER");
+            foreach (PlayMakerFSM fsm in player.GetComponentsInChildren<PlayMakerFSM>())
+            {
+                if (fsm.FsmName == "PickUp")
+                {
+                    pickUpFsm = fsm;
+                    foreach (var v in fsm.FsmVariables.GameObjectVariables)
+                    {
+                        if (v.Name == "PickedObject")
+                        {
+                            pickedObject = v;
+                            break;
+                        }
+                    }
+                    break;
+                }
+            }
+
+            itemPivot = player.transform.Find("Pivot/AnimPivot/Camera/FPSCamera/1Hand_Assemble/ItemPivot");
         }
+
         private void Mod_OnGUI()
         {
             GUIStyle style = new GUIStyle();
@@ -65,83 +75,100 @@ namespace MSCMoveRotateItem
             style.alignment = TextAnchor.UpperCenter;
 
             string heldName;
-            if (heldGO == null)
+            if (pickedObject == null || pickedObject.Value == null)
             {
                 heldName = "NULL";
             }
             else
             {
-                heldName = heldGO.name;
+                heldName = pickedObject.Value.name;
             }
 
-            GUI.Label(new Rect(0, 20, Screen.width, 60), $"ItemPivot: {(itemPivot != null ? "FOUND" : "NULL")}  |  HeldGO: {heldName}", style);
+            string hijackStatus;
+            if (shiftHijacked)
+            {
+                hijackStatus = "HIJACKED";
+            }
+            else
+            {
+                hijackStatus = "normal";
+            }
+
+            GUI.Label(new Rect(0, 20, Screen.width, 60), $"HeldGO: {heldName}  |  Status: {hijackStatus}", style);
         }
+
         private void Mod_Update()
         {
-            TryFindItemPivot();
+            bool shiftHeld = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+            float scroll = Input.GetAxis("Mouse ScrollWheel");
 
-            heldGO = null;
-            if (itemPivot != null && itemPivot.childCount > 0)
+            if (shiftHeld && !shiftHijacked && pickedObject != null && pickedObject.Value != null)
             {
-                heldGO = itemPivot.GetChild(0).gameObject;
+                hijackedGO = pickedObject.Value;
+
+                Rigidbody rb = hijackedGO.GetComponent<Rigidbody>();
+                if (rb != null)
+                {
+                    rb.isKinematic = true;
+                    rb.velocity = Vector3.zero;
+                    rb.angularVelocity = Vector3.zero;
+                }
+
+                hijackedGO.transform.SetParent(fpsCamera.transform, true);
+                pickedObject.Value = null;
+                pickUpFsm.SendEvent("DROP_PART");
+                shiftHijacked = true;
+            }
+            else if (!shiftHeld && shiftHijacked)
+            {
+                ReleaseHijack();
+            }
+
+            if (shiftHijacked && scroll != 0f)
+            {
+                if (hijackedGO != null)
+                {
+                    hijackedGO.transform.Rotate(0f, 0f, scroll * 80f, Space.Self);
+                }
             }
 
             if (debugKey.GetKeybindDown())
             {
-                //string[] path = new string[] { "PLAYER", "Pivot", "AnimPivot", "Camera", "FPSCamera", "1Hand_Assemble", "ItemPivot" };
-                //GameObject root = GameObject.Find("PLAYER");
-                //Transform current = root.transform;
-                //foreach (string step in path)
-                //{
-                //    if (step == "PLAYER") { continue; }
-                //    current = current.Find(step);
-                //    if (current == null)
-                //    {
-                //        LogToFile($"PATH BROKE at: {step}");
-                //        break;
-                //    }
-                //    LogToFile($"Found: {current.name} childCount={current.childCount}");
-                //}
-                //if (current != null)
-                //{
-                //    LogToFile($"Final node children:");
-                //    foreach (Transform child in current)
-                //    {
-                //        LogToFile($"  child: {child.name} active={child.gameObject.activeSelf}");
-                //    }
-                //}
-
-                GameObject player = GameObject.Find("PLAYER");
-                if (player != null)
+                HutongGames.PlayMaker.FsmBool handEmpty = null;
+                foreach (var v in pickUpFsm.FsmVariables.BoolVariables)
                 {
-                    LogToFile($"Dumping FSMs on PLAYER:");
-                    foreach (PlayMakerFSM fsm in player.GetComponents<PlayMakerFSM>())
+                    if (v.Name == "HandEmpty")
                     {
-                        LogToFile($"  FSM: '{fsm.FsmName}'  currentState='{fsm.ActiveStateName}'");
-                        foreach (var state in fsm.FsmStates)
-                        {
-                            LogToFile($"    state: {state.Name}");
-                        }
+                        handEmpty = v;
+                        break;
                     }
                 }
+                LogToFile($"[DEBUG] HandEmpty={handEmpty?.Value}");
             }
-            float scroll = Input.GetAxis("Mouse ScrollWheel"); 
-            if (scroll != 0f && itemPivot != null)
+        }
+
+        private void ReleaseHijack()
+        {
+            if (hijackedGO == null) { return; }
+
+            hijackedGO.transform.SetParent(itemPivot, true);
+            hijackedGO.transform.localPosition = Vector3.zero;
+
+            pickedObject.Value = hijackedGO;
+            pickUpFsm.SendEvent("LOOP");
+
+            LogToFile($"ReleaseHijack: FSM state after LOOP = '{pickUpFsm.ActiveStateName}'");
+
+            Rigidbody rb = hijackedGO.GetComponent<Rigidbody>();
+            if (rb != null)
             {
-                LogToFile($"[SCROLL] ItemPivot localRot={itemPivot.localEulerAngles}  heldGO localRot={heldGO?.transform.localEulerAngles}");
-            }
-            bool shiftHeld = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
-
-            if (shiftHeld && scroll != 0f)
-            {
-                zRotationOffset += scroll * 80f;
+                rb.isKinematic = true;
+                rb.velocity = Vector3.zero;
+                rb.angularVelocity = Vector3.zero;
             }
 
-            if (heldGO == null) { return; }
-
-            Vector3 angles = heldGO.transform.localEulerAngles;
-            angles.z = zRotationOffset;
-            heldGO.transform.localEulerAngles = angles;
+            hijackedGO = null;
+            shiftHijacked = false;
         }
     }
 }
