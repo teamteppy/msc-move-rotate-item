@@ -22,6 +22,9 @@ namespace MSCMoveRotateItem
         private GameObject hijackedGO;
         private bool shiftHijacked = false;
 
+        private GameObject altHijackedGO;
+        private bool altHijacked = false;
+
         private FsmBool handEmpty;
         private FsmGameObject raycastHitObject;
         private FsmInt lenght;
@@ -95,7 +98,11 @@ namespace MSCMoveRotateItem
             string hijackStatus;
             if (shiftHijacked)
             {
-                hijackStatus = "HIJACKED";
+                hijackStatus = "SHIFT HIJACKED";
+            }
+            else if (altHijacked)
+            {
+                hijackStatus = "ALT HIJACKED";
             }
             else
             {
@@ -108,6 +115,7 @@ namespace MSCMoveRotateItem
         private void Mod_Update()
         {
             bool shiftHeld = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+            bool altHeld = Input.GetKey(KeyCode.LeftAlt) || Input.GetKey(KeyCode.RightAlt);
             float scroll = Input.GetAxis("Mouse ScrollWheel");
 
             if (shiftHeld && !shiftHijacked && pickedObject != null && pickedObject.Value != null)
@@ -129,7 +137,29 @@ namespace MSCMoveRotateItem
             }
             else if (!shiftHeld && shiftHijacked)
             {
-                ReleaseHijack();
+                ReleaseShiftHijack();
+            }
+
+            if (altHeld && !altHijacked && pickedObject != null && pickedObject.Value != null)
+            {
+                altHijackedGO = pickedObject.Value;
+
+                Rigidbody rb = altHijackedGO.GetComponent<Rigidbody>();
+                if (rb != null)
+                {
+                    rb.isKinematic = true;
+                    rb.velocity = Vector3.zero;
+                    rb.angularVelocity = Vector3.zero;
+                }
+
+                altHijackedGO.transform.SetParent(fpsCamera.transform, true);
+                pickedObject.Value = null;
+                pickUpFsm.SendEvent("DROP_PART");
+                altHijacked = true;
+            }
+            else if (!altHeld && altHijacked)
+            {
+                ReleaseAltHijack();
             }
 
             if (shiftHijacked && scroll != 0f)
@@ -137,6 +167,14 @@ namespace MSCMoveRotateItem
                 if (hijackedGO != null)
                 {
                     hijackedGO.transform.Rotate(0f, 0f, scroll * 80f, Space.Self);
+                }
+            }
+
+            if (altHijacked && scroll != 0f)
+            {
+                if (altHijackedGO != null)
+                {
+                    altHijackedGO.transform.Rotate(0f, scroll * 80f, 0f, Space.Self);
                 }
             }
 
@@ -219,7 +257,7 @@ namespace MSCMoveRotateItem
             }
         }
 
-        private void ReleaseHijack()
+        private void ReleaseShiftHijack()
         {
             if (hijackedGO == null) { return; }
 
@@ -241,10 +279,38 @@ namespace MSCMoveRotateItem
 
             pickUpFsm.SendEvent("FINISHED");
 
-            LogToFile($"ReleaseHijack: FSM='{pickUpFsm.ActiveStateName}'  HandEmpty={handEmpty.Value}  RaycastHitObject='{(raycastHitObject.Value != null ? raycastHitObject.Value.name : "NULL")}'  Lenght={lenght.Value}");
+            LogToFile($"ReleaseShiftHijack: FSM='{pickUpFsm.ActiveStateName}'  HandEmpty={handEmpty.Value}  RaycastHitObject='{(raycastHitObject.Value != null ? raycastHitObject.Value.name : "NULL")}'  Lenght={lenght.Value}");
 
             hijackedGO = null;
             shiftHijacked = false;
+        }
+
+        private void ReleaseAltHijack()
+        {
+            if (altHijackedGO == null) { return; }
+
+            altHijackedGO.transform.SetParent(itemPivot, true);
+            altHijackedGO.transform.localPosition = Vector3.zero;
+
+            pickedObject.Value = altHijackedGO;
+            raycastHitObject.Value = altHijackedGO;
+            handEmpty.Value = false;
+            lenght.Value = altHijackedGO.name.Length;
+
+            Rigidbody rb = altHijackedGO.GetComponent<Rigidbody>();
+            if (rb != null)
+            {
+                rb.isKinematic = false;
+                rb.velocity = Vector3.zero;
+                rb.angularVelocity = Vector3.zero;
+            }
+
+            pickUpFsm.SendEvent("FINISHED");
+
+            LogToFile($"ReleaseAltHijack: FSM='{pickUpFsm.ActiveStateName}'  HandEmpty={handEmpty.Value}  RaycastHitObject='{(raycastHitObject.Value != null ? raycastHitObject.Value.name : "NULL")}'  Lenght={lenght.Value}");
+
+            altHijackedGO = null;
+            altHijacked = false;
         }
     }
 }
