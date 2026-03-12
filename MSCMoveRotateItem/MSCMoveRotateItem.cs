@@ -7,10 +7,10 @@ namespace MSCMoveRotateItem
     public class MSCMoveRotateItem : Mod
     {
         public override string ID => "MSCMoveRotateItem";
-        public override string Name => "Move Forward Rotate Item";
+        public override string Name => "Move and Rotate Item";
         public override string Author => "teamteppy";
         public override string Version => "1.0";
-        public override string Description => "";
+        public override string Description => "More rotation and movement with item pickup: Hold down Shift or Alt or Tab";
         public override Game SupportedGames => Game.MySummerCar;
 
         private FsmGameObject pickedObject;
@@ -81,45 +81,7 @@ namespace MSCMoveRotateItem
 
         private void Mod_OnGUI()
         {
-            GUIStyle style = new GUIStyle();
-            style.fontSize = 20;
-            style.fontStyle = FontStyle.Bold;
-            style.normal.textColor = Color.white;
-            style.alignment = TextAnchor.UpperCenter;
 
-            string heldName;
-            if (pickedObject == null || pickedObject.Value == null)
-            {
-                heldName = "NULL";
-            }
-            else
-            {
-                heldName = pickedObject.Value.name;
-            }
-
-            string hijackStatus;
-            if (shiftHijacked)
-            {
-                hijackStatus = "SHIFT HIJACKED";
-            }
-            else if (altHijacked)
-            {
-                hijackStatus = "ALT HIJACKED";
-            }
-            else if (middleHijacked)
-            {
-                hijackStatus = "MIDDLE HIJACKED";
-            }
-            else if (tabHijacked)
-            {
-                hijackStatus = "TAB HIJACKED";
-            }
-            else
-            {
-                hijackStatus = "normal";
-            }
-
-            GUI.Label(new Rect(0, 20, Screen.width, 60), $"HeldGO: {heldName}  |  Status: {hijackStatus}", style);
         }
 
         private void Mod_Update()
