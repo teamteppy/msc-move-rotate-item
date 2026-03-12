@@ -13,7 +13,6 @@ namespace MSCMoveRotateItem
         public override string Description => "";
         public override Game SupportedGames => Game.MySummerCar;
 
-        private SettingsKeybind debugKey;
         private FsmGameObject pickedObject;
         private PlayMakerFSM pickUpFsm;
         private Camera fpsCamera;
@@ -47,15 +46,8 @@ namespace MSCMoveRotateItem
             SetupFunction(Setup.ModSettings, Mod_Settings);
         }
 
-        private void LogToFile(string message)
-        {
-            string path = Application.persistentDataPath + "/MSCPauseMod_debug.txt";
-            System.IO.File.AppendAllText(path, message + "\n");
-        }
-
         private void Mod_Settings()
         {
-            debugKey = Keybind.Add("DebugKey", "Debug Game", KeyCode.Alpha9);
         }
 
         private void Mod_OnLoad()
@@ -288,83 +280,6 @@ namespace MSCMoveRotateItem
                 }
             }
 
-            if (debugKey.GetKeybindDown())
-            {
-                LogToFile("=== FULL STATE DUMP ===");
-                LogToFile($"FSM state: '{pickUpFsm.ActiveStateName}'");
-                LogToFile($"FSM on: '{pickUpFsm.gameObject.name}'");
-                LogToFile($"HandEmpty: {handEmpty.Value}");
-                LogToFile($"pickedObject: '{(pickedObject.Value != null ? pickedObject.Value.name : "NULL")}'");
-
-                LogToFile("--- FSM Bool Variables ---");
-                foreach (var v in pickUpFsm.FsmVariables.BoolVariables)
-                {
-                    LogToFile($"  {v.Name} = {v.Value}");
-                }
-
-                LogToFile("--- FSM Float Variables ---");
-                foreach (var v in pickUpFsm.FsmVariables.FloatVariables)
-                {
-                    LogToFile($"  {v.Name} = {v.Value}");
-                }
-
-                LogToFile("--- FSM Int Variables ---");
-                foreach (var v in pickUpFsm.FsmVariables.IntVariables)
-                {
-                    LogToFile($"  {v.Name} = {v.Value}");
-                }
-
-                LogToFile("--- FSM GameObject Variables ---");
-                foreach (var v in pickUpFsm.FsmVariables.GameObjectVariables)
-                {
-                    LogToFile($"  {v.Name} = '{(v.Value != null ? v.Value.name : "NULL")}'");
-                }
-
-                LogToFile("--- FSM Vector3 Variables ---");
-                foreach (var v in pickUpFsm.FsmVariables.Vector3Variables)
-                {
-                    LogToFile($"  {v.Name} = {v.Value}");
-                }
-
-                if (pickedObject.Value != null)
-                {
-                    GameObject item = pickedObject.Value;
-                    LogToFile("--- Item GameObject ---");
-                    LogToFile($"  name: {item.name}");
-                    LogToFile($"  layer: {item.layer}");
-                    LogToFile($"  parent: '{(item.transform.parent != null ? item.transform.parent.name : "NULL")}'");
-                    LogToFile($"  localPosition: {item.transform.localPosition}");
-                    LogToFile($"  localRotation: {item.transform.localRotation}");
-                    Rigidbody rb = item.GetComponent<Rigidbody>();
-                    if (rb != null)
-                    {
-                        LogToFile($"  rb.isKinematic: {rb.isKinematic}");
-                        LogToFile($"  rb.useGravity: {rb.useGravity}");
-                        LogToFile($"  rb.constraints: {rb.constraints}");
-                    }
-                }
-
-                LogToFile("--- Hand GameObject ---");
-                LogToFile($"  name: {pickUpFsm.gameObject.name}");
-                LogToFile($"  layer: {pickUpFsm.gameObject.layer}");
-                LogToFile($"  parent: '{(pickUpFsm.gameObject.transform.parent != null ? pickUpFsm.gameObject.transform.parent.name : "NULL")}'");
-                LogToFile($"  localPosition: {pickUpFsm.gameObject.transform.localPosition}");
-                LogToFile($"  localRotation: {pickUpFsm.gameObject.transform.localRotation}");
-                LogToFile($"  childCount: {pickUpFsm.gameObject.transform.childCount}");
-                foreach (Transform child in pickUpFsm.gameObject.transform)
-                {
-                    LogToFile($"    child: '{child.name}'");
-                }
-
-                LogToFile("--- itemPivot ---");
-                LogToFile($"  childCount: {itemPivot.childCount}");
-                foreach (Transform child in itemPivot)
-                {
-                    LogToFile($"    child: '{child.name}'  layer={child.gameObject.layer}  active={child.gameObject.activeSelf}");
-                }
-
-                LogToFile("=== END DUMP ===");
-            }
         }
 
         private void ReleaseShiftHijack()
@@ -388,8 +303,6 @@ namespace MSCMoveRotateItem
             }
 
             pickUpFsm.SendEvent("FINISHED");
-
-            LogToFile($"ReleaseShiftHijack: FSM='{pickUpFsm.ActiveStateName}'  HandEmpty={handEmpty.Value}  RaycastHitObject='{(raycastHitObject.Value != null ? raycastHitObject.Value.name : "NULL")}'  Lenght={lenght.Value}");
 
             hijackedGO = null;
             shiftHijacked = false;
@@ -417,8 +330,6 @@ namespace MSCMoveRotateItem
 
             pickUpFsm.SendEvent("FINISHED");
 
-            LogToFile($"ReleaseAltHijack: FSM='{pickUpFsm.ActiveStateName}'  HandEmpty={handEmpty.Value}  RaycastHitObject='{(raycastHitObject.Value != null ? raycastHitObject.Value.name : "NULL")}'  Lenght={lenght.Value}");
-
             altHijackedGO = null;
             altHijacked = false;
         }
@@ -445,8 +356,6 @@ namespace MSCMoveRotateItem
 
             pickUpFsm.SendEvent("FINISHED");
 
-            LogToFile($"ReleaseMiddleHijack: FSM='{pickUpFsm.ActiveStateName}'  HandEmpty={handEmpty.Value}  RaycastHitObject='{(raycastHitObject.Value != null ? raycastHitObject.Value.name : "NULL")}'  Lenght={lenght.Value}");
-
             middleHijackedGO = null;
             middleHijacked = false;
         }
@@ -471,8 +380,6 @@ namespace MSCMoveRotateItem
             }
 
             pickUpFsm.SendEvent("FINISHED");
-
-            LogToFile($"ReleaseTabHijack: FSM='{pickUpFsm.ActiveStateName}'  HandEmpty={handEmpty.Value}  RaycastHitObject='{(raycastHitObject.Value != null ? raycastHitObject.Value.name : "NULL")}'  Lenght={lenght.Value}");
 
             tabHijackedGO = null;
             tabHijacked = false;
