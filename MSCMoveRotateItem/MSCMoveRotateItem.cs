@@ -28,6 +28,13 @@ namespace MSCMoveRotateItem
         private GameObject middleHijackedGO;
         private bool middleHijacked = false;
 
+        private GameObject tabHijackedGO;
+        private bool tabHijacked = false;
+        private Vector3 tabHijackOrigin;
+
+        private const float TAB_MOUSE_SENSITIVITY = 0.05f;
+        private const float TAB_CLAMP_RADIUS = 0.5f;
+
         private FsmBool handEmpty;
         private FsmGameObject raycastHitObject;
         private FsmInt lenght;
@@ -111,6 +118,10 @@ namespace MSCMoveRotateItem
             {
                 hijackStatus = "MIDDLE HIJACKED";
             }
+            else if (tabHijacked)
+            {
+                hijackStatus = "TAB HIJACKED";
+            }
             else
             {
                 hijackStatus = "normal";
@@ -124,6 +135,7 @@ namespace MSCMoveRotateItem
             bool shiftHeld = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
             bool altHeld = Input.GetKey(KeyCode.LeftAlt) || Input.GetKey(KeyCode.RightAlt);
             bool middleHeld = Input.GetMouseButton(2);
+            bool tabHeld = Input.GetKey(KeyCode.Tab);
             float scroll = Input.GetAxis("Mouse ScrollWheel");
 
             if (shiftHeld && !shiftHijacked && pickedObject != null && pickedObject.Value != null)
@@ -192,6 +204,30 @@ namespace MSCMoveRotateItem
                 ReleaseMiddleHijack();
             }
 
+            if (tabHeld && !tabHijacked && pickedObject != null && pickedObject.Value != null)
+            {
+                tabHijackedGO = pickedObject.Value;
+
+                tabHijackOrigin = new Vector3(tabHijackedGO.transform.position.x, 0f, tabHijackedGO.transform.position.z);
+
+                Rigidbody rb = tabHijackedGO.GetComponent<Rigidbody>();
+                if (rb != null)
+                {
+                    rb.isKinematic = true;
+                    rb.velocity = Vector3.zero;
+                    rb.angularVelocity = Vector3.zero;
+                }
+
+                tabHijackedGO.transform.SetParent(fpsCamera.transform, true);
+                pickedObject.Value = null;
+                pickUpFsm.SendEvent("DROP_PART");
+                tabHijacked = true;
+            }
+            else if (!tabHeld && tabHijacked)
+            {
+                ReleaseTabHijack();
+            }
+
             if (shiftHijacked && scroll != 0f)
             {
                 if (hijackedGO != null)
@@ -213,6 +249,42 @@ namespace MSCMoveRotateItem
                 if (middleHijackedGO != null)
                 {
                     middleHijackedGO.transform.localRotation = Quaternion.identity;
+                }
+            }
+
+            if (tabHijacked)
+            {
+                if (tabHijackedGO != null)
+                {
+                    float mouseDeltaX = Input.GetAxis("Mouse X");
+                    float mouseDeltaY = Input.GetAxis("Mouse Y");
+
+                    Vector3 cameraForwardFlat = fpsCamera.transform.forward;
+                    cameraForwardFlat.y = 0f;
+                    cameraForwardFlat.Normalize();
+
+                    Vector3 cameraRightFlat = fpsCamera.transform.right;
+                    cameraRightFlat.y = 0f;
+                    cameraRightFlat.Normalize();
+
+                    Vector3 moveRight = cameraRightFlat * mouseDeltaX * TAB_MOUSE_SENSITIVITY;
+                    Vector3 moveForward = cameraForwardFlat * mouseDeltaY * TAB_MOUSE_SENSITIVITY;
+
+                    Vector3 newPivotPosition = itemPivot.position + moveRight + moveForward;
+
+                    Vector3 originFlat = new Vector3(tabHijackOrigin.x, newPivotPosition.y, tabHijackOrigin.z);
+                    Vector3 offsetFromOrigin = newPivotPosition - originFlat;
+
+                    if (offsetFromOrigin.magnitude > TAB_CLAMP_RADIUS)
+                    {
+                        offsetFromOrigin = offsetFromOrigin.normalized * TAB_CLAMP_RADIUS;
+                        newPivotPosition = originFlat + offsetFromOrigin;
+                    }
+
+                    Vector3 moveDelta = newPivotPosition - itemPivot.position;
+
+                    itemPivot.position = newPivotPosition;
+                    tabHijackedGO.transform.position += moveDelta;
                 }
             }
 
@@ -377,6 +449,33 @@ namespace MSCMoveRotateItem
 
             middleHijackedGO = null;
             middleHijacked = false;
+        }
+
+        private void ReleaseTabHijack()
+        {
+            if (tabHijackedGO == null) { return; }
+
+            tabHijackedGO.transform.SetParent(itemPivot, true);
+
+            pickedObject.Value = tabHijackedGO;
+            raycastHitObject.Value = tabHijackedGO;
+            handEmpty.Value = false;
+            lenght.Value = tabHijackedGO.name.Length;
+
+            Rigidbody rb = tabHijackedGO.GetComponent<Rigidbody>();
+            if (rb != null)
+            {
+                rb.isKinematic = false;
+                rb.velocity = Vector3.zero;
+                rb.angularVelocity = Vector3.zero;
+            }
+
+            pickUpFsm.SendEvent("FINISHED");
+
+            LogToFile($"ReleaseTabHijack: FSM='{pickUpFsm.ActiveStateName}'  HandEmpty={handEmpty.Value}  RaycastHitObject='{(raycastHitObject.Value != null ? raycastHitObject.Value.name : "NULL")}'  Lenght={lenght.Value}");
+
+            tabHijackedGO = null;
+            tabHijacked = false;
         }
     }
 }
