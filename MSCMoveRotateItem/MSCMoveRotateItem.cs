@@ -21,9 +21,11 @@ namespace MSCMoveRotateItem
 
         private GameObject hijackedGO;
         private bool shiftHijacked = false;
+        private bool shiftPendingRelease = false;
 
         private GameObject altHijackedGO;
         private bool altHijacked = false;
+        private bool altPendingRelease = false;
 
         private GameObject middleHijackedGO;
         private bool middleHijacked = false;
@@ -41,6 +43,9 @@ namespace MSCMoveRotateItem
         private FsmBool handEmpty;
         private FsmGameObject raycastHitObject;
         private FsmInt lenght;
+
+        private bool shiftHeldLastFrame = false;
+        private bool altHeldLastFrame = false;
 
         public override void ModSetup()
         {
@@ -103,7 +108,12 @@ namespace MSCMoveRotateItem
             bool tabHeld = Input.GetKey(KeyCode.Tab);
             float scroll = Input.GetAxis("Mouse ScrollWheel");
 
-            if (!inToolMode && shiftHeld && scroll != 0f && !shiftHijacked && pickedObject != null && pickedObject.Value != null)
+            if (shiftPendingRelease)
+            {
+                shiftPendingRelease = false;
+                ReleaseShiftHijack();
+            }
+            else if (!inToolMode && shiftHeld && shiftHeldLastFrame && Mathf.Abs(scroll) > 0.15f && !shiftHijacked && pickedObject != null && pickedObject.Value != null)
             {
                 hijackedGO = pickedObject.Value;
 
@@ -120,12 +130,17 @@ namespace MSCMoveRotateItem
                 pickUpFsm.SendEvent("DROP_PART");
                 shiftHijacked = true;
             }
-            else if (!shiftHeld && shiftHijacked)
+            else if (shiftHijacked && !shiftHeld)
             {
-                ReleaseShiftHijack();
+                shiftPendingRelease = true;
             }
 
-            if (!inToolMode && altHeld && scroll != 0f && !altHijacked && pickedObject != null && pickedObject.Value != null)
+            if (altPendingRelease)
+            {
+                altPendingRelease = false;
+                ReleaseAltHijack();
+            }
+            else if (!inToolMode && altHeld && altHeldLastFrame && Mathf.Abs(scroll) > 0.15f && !altHijacked && pickedObject != null && pickedObject.Value != null)
             {
                 altHijackedGO = pickedObject.Value;
 
@@ -142,9 +157,9 @@ namespace MSCMoveRotateItem
                 pickUpFsm.SendEvent("DROP_PART");
                 altHijacked = true;
             }
-            else if (!altHeld && altHijacked)
+            else if (altHijacked && !altHeld)
             {
-                ReleaseAltHijack();
+                altPendingRelease = true;
             }
 
             if (middlePendingRelease)
@@ -316,6 +331,9 @@ namespace MSCMoveRotateItem
 
                 LogToFile("=== END DUMP ===");
             }
+
+            shiftHeldLastFrame = shiftHeld;
+            altHeldLastFrame = altHeld;
         }
 
         private void ReleaseShiftHijack()
