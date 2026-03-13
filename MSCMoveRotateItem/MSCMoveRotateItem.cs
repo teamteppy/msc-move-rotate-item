@@ -27,6 +27,9 @@ namespace MSCMoveRotateItem
 
         private GameObject middleHijackedGO;
         private bool middleHijacked = false;
+        private bool middlePendingRelease = false;
+        private float middleLastReleaseTime = 0f;
+        private const float MIDDLE_COOLDOWN = 2f;
 
         private GameObject tabHijackedGO;
         private bool tabHijacked = false;
@@ -97,11 +100,10 @@ namespace MSCMoveRotateItem
 
             bool shiftHeld = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
             bool altHeld = Input.GetKey(KeyCode.LeftAlt) || Input.GetKey(KeyCode.RightAlt);
-            bool middleHeld = Input.GetMouseButton(2);
             bool tabHeld = Input.GetKey(KeyCode.Tab);
             float scroll = Input.GetAxis("Mouse ScrollWheel");
 
-            if (!inToolMode && shiftHeld && !shiftHijacked && pickedObject != null && pickedObject.Value != null)
+            if (!inToolMode && shiftHeld && scroll != 0f && !shiftHijacked && pickedObject != null && pickedObject.Value != null)
             {
                 hijackedGO = pickedObject.Value;
 
@@ -123,7 +125,7 @@ namespace MSCMoveRotateItem
                 ReleaseShiftHijack();
             }
 
-            if (!inToolMode && altHeld && !altHijacked && pickedObject != null && pickedObject.Value != null)
+            if (!inToolMode && altHeld && scroll != 0f && !altHijacked && pickedObject != null && pickedObject.Value != null)
             {
                 altHijackedGO = pickedObject.Value;
 
@@ -145,7 +147,12 @@ namespace MSCMoveRotateItem
                 ReleaseAltHijack();
             }
 
-            if (!inToolMode && middleHeld && !middleHijacked && pickedObject != null && pickedObject.Value != null)
+            if (middlePendingRelease)
+            {
+                middlePendingRelease = false;
+                ReleaseMiddleHijack();
+            }
+            else if (!inToolMode && Input.GetMouseButtonDown(2) && !middleHijacked && Time.time - middleLastReleaseTime > MIDDLE_COOLDOWN && pickedObject != null && pickedObject.Value != null)
             {
                 middleHijackedGO = pickedObject.Value;
 
@@ -162,9 +169,9 @@ namespace MSCMoveRotateItem
                 pickUpFsm.SendEvent("DROP_PART");
                 middleHijacked = true;
             }
-            else if (!middleHeld && middleHijacked)
+            else if (middleHijacked && Input.GetMouseButtonUp(2))
             {
-                ReleaseMiddleHijack();
+                middlePendingRelease = true;
             }
 
             if (!inToolMode && tabHeld && !tabHijacked && pickedObject != null && pickedObject.Value != null)
@@ -385,6 +392,7 @@ namespace MSCMoveRotateItem
 
             pickUpFsm.SendEvent("FINISHED");
 
+            middleLastReleaseTime = Time.time;
             middleHijackedGO = null;
             middleHijacked = false;
         }
