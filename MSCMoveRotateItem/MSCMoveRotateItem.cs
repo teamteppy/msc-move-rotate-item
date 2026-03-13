@@ -22,10 +22,14 @@ namespace MSCMoveRotateItem
         private GameObject hijackedGO;
         private bool shiftHijacked = false;
         private bool shiftPendingRelease = false;
+        private float shiftHeldSince = 0f;
 
         private GameObject altHijackedGO;
         private bool altHijacked = false;
         private bool altPendingRelease = false;
+        private float altHeldSince = 0f;
+
+        private const float MIN_HOLD_DURATION = 0.1f;
 
         private GameObject middleHijackedGO;
         private bool middleHijacked = false;
@@ -108,12 +112,22 @@ namespace MSCMoveRotateItem
             bool tabHeld = Input.GetKey(KeyCode.Tab);
             float scroll = Input.GetAxis("Mouse ScrollWheel");
 
+            if (!shiftHeldLastFrame && shiftHeld)
+            {
+                shiftHeldSince = Time.time;
+            }
+
+            if (!altHeldLastFrame && altHeld)
+            {
+                altHeldSince = Time.time;
+            }
+
             if (shiftPendingRelease)
             {
                 shiftPendingRelease = false;
                 ReleaseShiftHijack();
             }
-            else if (!inToolMode && shiftHeld && shiftHeldLastFrame && Mathf.Abs(scroll) > 0.15f && !shiftHijacked && pickedObject != null && pickedObject.Value != null)
+            else if (!inToolMode && shiftHeld && Time.time - shiftHeldSince > MIN_HOLD_DURATION && scroll != 0f && !shiftHijacked && pickedObject != null && pickedObject.Value != null)
             {
                 hijackedGO = pickedObject.Value;
 
@@ -140,7 +154,7 @@ namespace MSCMoveRotateItem
                 altPendingRelease = false;
                 ReleaseAltHijack();
             }
-            else if (!inToolMode && altHeld && altHeldLastFrame && Mathf.Abs(scroll) > 0.15f && !altHijacked && pickedObject != null && pickedObject.Value != null)
+            else if (!inToolMode && altHeld && Time.time - altHeldSince > MIN_HOLD_DURATION && scroll != 0f && !altHijacked && pickedObject != null && pickedObject.Value != null)
             {
                 altHijackedGO = pickedObject.Value;
 
