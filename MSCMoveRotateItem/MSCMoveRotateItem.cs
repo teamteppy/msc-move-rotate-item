@@ -40,6 +40,11 @@ namespace MSCMoveRotateItem
         private GameObject tabHijackedGO;
         private bool tabHijacked = false;
         private Vector3 tabHijackOrigin;
+        private Vector3 tabItemWorldPosition;
+        private float tabHeldSince = 0f;
+
+        private int tabHijackedOriginalLayer;
+
 
         private const float TAB_MOUSE_SENSITIVITY = 0.05f;
         private const float TAB_CLAMP_RADIUS = 0.5f;
@@ -50,6 +55,7 @@ namespace MSCMoveRotateItem
 
         private bool shiftHeldLastFrame = false;
         private bool altHeldLastFrame = false;
+        private bool tabHeldLastFrame = false;
 
         public override void ModSetup()
         {
@@ -120,6 +126,11 @@ namespace MSCMoveRotateItem
             if (!altHeldLastFrame && altHeld)
             {
                 altHeldSince = Time.time;
+            }
+
+            if (!tabHeldLastFrame && tabHeld)
+            {
+                tabHeldSince = Time.time;
             }
 
             if (shiftPendingRelease)
@@ -203,11 +214,12 @@ namespace MSCMoveRotateItem
                 middlePendingRelease = true;
             }
 
-            if (!inToolMode && tabHeld && !tabHijacked && pickedObject != null && pickedObject.Value != null)
+            if (!inToolMode && tabHeld && Time.time - tabHeldSince > MIN_HOLD_DURATION && !tabHijacked && pickedObject != null && pickedObject.Value != null)
             {
                 tabHijackedGO = pickedObject.Value;
 
                 tabHijackOrigin = new Vector3(tabHijackedGO.transform.position.x, 0f, tabHijackedGO.transform.position.z);
+                tabItemWorldPosition = new Vector3(tabHijackedGO.transform.position.x, tabHijackedGO.transform.position.y, tabHijackedGO.transform.position.z);
 
                 Rigidbody rb = tabHijackedGO.GetComponent<Rigidbody>();
                 if (rb != null)
@@ -218,6 +230,8 @@ namespace MSCMoveRotateItem
                 }
 
                 tabHijackedGO.transform.SetParent(fpsCamera.transform, true);
+                tabHijackedGO.layer = LayerMask.NameToLayer("Parts");
+
                 pickedObject.Value = null;
                 pickUpFsm.SendEvent("DROP_PART");
                 tabHijacked = true;
@@ -269,85 +283,32 @@ namespace MSCMoveRotateItem
                     Vector3 moveRight = cameraRightFlat * mouseDeltaX * TAB_MOUSE_SENSITIVITY;
                     Vector3 moveForward = cameraForwardFlat * mouseDeltaY * TAB_MOUSE_SENSITIVITY;
 
-                    Vector3 newPivotPosition = itemPivot.position + moveRight + moveForward;
+                    tabItemWorldPosition.x += moveRight.x + moveForward.x;
+                    tabItemWorldPosition.z += moveRight.z + moveForward.z;
 
-                    Vector3 originFlat = new Vector3(tabHijackOrigin.x, newPivotPosition.y, tabHijackOrigin.z);
-                    Vector3 offsetFromOrigin = newPivotPosition - originFlat;
+                    Vector3 offsetFromOrigin = new Vector3(tabItemWorldPosition.x - tabHijackOrigin.x, 0f, tabItemWorldPosition.z - tabHijackOrigin.z);
 
                     if (offsetFromOrigin.magnitude > TAB_CLAMP_RADIUS)
                     {
                         offsetFromOrigin = offsetFromOrigin.normalized * TAB_CLAMP_RADIUS;
-                        newPivotPosition = originFlat + offsetFromOrigin;
+                        tabItemWorldPosition.x = tabHijackOrigin.x + offsetFromOrigin.x;
+                        tabItemWorldPosition.z = tabHijackOrigin.z + offsetFromOrigin.z;
                     }
 
-                    Vector3 moveDelta = newPivotPosition - itemPivot.position;
-
-                    itemPivot.position = newPivotPosition;
-                    tabHijackedGO.transform.position += moveDelta;
+                    itemPivot.position = tabItemWorldPosition;
+                    tabHijackedGO.transform.position = tabItemWorldPosition;
                 }
             }
 
             if (debugKey.GetKeybindDown())
             {
-                LogToFile("=== FULL STATE DUMP ===");
-                LogToFile($"FSM state: '{pickUpFsm.ActiveStateName}'");
-                LogToFile($"FSM on: '{pickUpFsm.gameObject.name}'");
-                LogToFile($"HandEmpty: {handEmpty.Value}");
-                LogToFile($"pickedObject: '{(pickedObject.Value != null ? pickedObject.Value.name : "NULL")}'");
-                LogToFile($"inToolMode: {inToolMode}");
-
-                LogToFile("--- FSM Bool Variables ---");
-                foreach (var v in pickUpFsm.FsmVariables.BoolVariables)
-                {
-                    LogToFile($"  {v.Name} = {v.Value}");
-                }
-
-                LogToFile("--- FSM Float Variables ---");
-                foreach (var v in pickUpFsm.FsmVariables.FloatVariables)
-                {
-                    LogToFile($"  {v.Name} = {v.Value}");
-                }
-
-                LogToFile("--- FSM Int Variables ---");
-                foreach (var v in pickUpFsm.FsmVariables.IntVariables)
-                {
-                    LogToFile($"  {v.Name} = {v.Value}");
-                }
-
-                LogToFile("--- FSM GameObject Variables ---");
-                foreach (var v in pickUpFsm.FsmVariables.GameObjectVariables)
-                {
-                    LogToFile($"  {v.Name} = '{(v.Value != null ? v.Value.name : "NULL")}'");
-                }
-
-                LogToFile("--- FSM Vector3 Variables ---");
-                foreach (var v in pickUpFsm.FsmVariables.Vector3Variables)
-                {
-                    LogToFile($"  {v.Name} = {v.Value}");
-                }
-
-                LogToFile("--- All FSMs on PLAYER ---");
-                GameObject playerObj = GameObject.Find("PLAYER");
-                if (playerObj != null)
-                {
-                    foreach (PlayMakerFSM fsm in playerObj.GetComponentsInChildren<PlayMakerFSM>())
-                    {
-                        LogToFile($"  FSM: '{fsm.FsmName}'  state: '{fsm.ActiveStateName}'  on: '{fsm.gameObject.name}'");
-                    }
-                }
-
-                LogToFile("--- itemPivot ---");
-                LogToFile($"  childCount: {itemPivot.childCount}");
-                foreach (Transform child in itemPivot)
-                {
-                    LogToFile($"    child: '{child.name}'  layer={child.gameObject.layer}  active={child.gameObject.activeSelf}");
-                }
-
-                LogToFile("=== END DUMP ===");
+                LogToFile($"tabHijackedGO layer: '{(tabHijackedGO != null ? tabHijackedGO.layer + " (" + LayerMask.LayerToName(tabHijackedGO.layer) + ")" : "NULL")}'");
+                LogToFile($"pickedObject layer: '{(pickedObject.Value != null ? pickedObject.Value.layer + " (" + LayerMask.LayerToName(pickedObject.Value.layer) + ")" : "NULL")}'");
             }
 
             shiftHeldLastFrame = shiftHeld;
             altHeldLastFrame = altHeld;
+            tabHeldLastFrame = tabHeld;
         }
 
         private void ReleaseShiftHijack()
@@ -433,12 +394,9 @@ namespace MSCMoveRotateItem
         {
             if (tabHijackedGO == null) { return; }
 
-            tabHijackedGO.transform.SetParent(itemPivot, true);
-
-            pickedObject.Value = tabHijackedGO;
-            raycastHitObject.Value = tabHijackedGO;
-            handEmpty.Value = false;
-            lenght.Value = tabHijackedGO.name.Length;
+            tabHijackedGO.transform.SetParent(null);
+            tabHijackedGO.layer = LayerMask.NameToLayer("Parts");
+            tabHijackedGO.transform.position = tabItemWorldPosition;
 
             Rigidbody rb = tabHijackedGO.GetComponent<Rigidbody>();
             if (rb != null)
@@ -446,9 +404,11 @@ namespace MSCMoveRotateItem
                 rb.isKinematic = false;
                 rb.velocity = Vector3.zero;
                 rb.angularVelocity = Vector3.zero;
+                rb.WakeUp();
             }
 
-            pickUpFsm.SendEvent("FINISHED");
+            pickedObject.Value = null;
+            pickUpFsm.SendEvent("DROP_PART");
 
             tabHijackedGO = null;
             tabHijacked = false;
