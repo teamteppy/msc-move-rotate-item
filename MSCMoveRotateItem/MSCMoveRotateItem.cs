@@ -13,6 +13,7 @@ namespace MSCMoveRotateItem
         public override string Description => "More rotation and movement with item pickup: Hold down Shift or Alt or Tab";
         public override Game SupportedGames => Game.MySummerCar;
 
+        private SettingsKeybind debugKey;
         private FsmGameObject pickedObject;
         private PlayMakerFSM pickUpFsm;
         private Camera fpsCamera;
@@ -46,8 +47,15 @@ namespace MSCMoveRotateItem
             SetupFunction(Setup.ModSettings, Mod_Settings);
         }
 
+        private void LogToFile(string message)
+        {
+            string path = Application.persistentDataPath + "/MSCPauseMod_debug.txt";
+            System.IO.File.AppendAllText(path, message + "\n");
+        }
+
         private void Mod_Settings()
         {
+            debugKey = Keybind.Add("DebugKey", "Debug Game", KeyCode.Alpha9);
         }
 
         private void Mod_OnLoad()
@@ -81,18 +89,19 @@ namespace MSCMoveRotateItem
 
         private void Mod_OnGUI()
         {
-
         }
 
         private void Mod_Update()
         {
+            bool inToolMode = pickUpFsm.gameObject.name != "Hand";
+
             bool shiftHeld = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
             bool altHeld = Input.GetKey(KeyCode.LeftAlt) || Input.GetKey(KeyCode.RightAlt);
             bool middleHeld = Input.GetMouseButton(2);
             bool tabHeld = Input.GetKey(KeyCode.Tab);
             float scroll = Input.GetAxis("Mouse ScrollWheel");
 
-            if (shiftHeld && !shiftHijacked && pickedObject != null && pickedObject.Value != null)
+            if (!inToolMode && shiftHeld && !shiftHijacked && pickedObject != null && pickedObject.Value != null)
             {
                 hijackedGO = pickedObject.Value;
 
@@ -114,7 +123,7 @@ namespace MSCMoveRotateItem
                 ReleaseShiftHijack();
             }
 
-            if (altHeld && !altHijacked && pickedObject != null && pickedObject.Value != null)
+            if (!inToolMode && altHeld && !altHijacked && pickedObject != null && pickedObject.Value != null)
             {
                 altHijackedGO = pickedObject.Value;
 
@@ -136,7 +145,7 @@ namespace MSCMoveRotateItem
                 ReleaseAltHijack();
             }
 
-            if (middleHeld && !middleHijacked && pickedObject != null && pickedObject.Value != null)
+            if (!inToolMode && middleHeld && !middleHijacked && pickedObject != null && pickedObject.Value != null)
             {
                 middleHijackedGO = pickedObject.Value;
 
@@ -158,7 +167,7 @@ namespace MSCMoveRotateItem
                 ReleaseMiddleHijack();
             }
 
-            if (tabHeld && !tabHijacked && pickedObject != null && pickedObject.Value != null)
+            if (!inToolMode && tabHeld && !tabHijacked && pickedObject != null && pickedObject.Value != null)
             {
                 tabHijackedGO = pickedObject.Value;
 
@@ -242,6 +251,64 @@ namespace MSCMoveRotateItem
                 }
             }
 
+            if (debugKey.GetKeybindDown())
+            {
+                LogToFile("=== FULL STATE DUMP ===");
+                LogToFile($"FSM state: '{pickUpFsm.ActiveStateName}'");
+                LogToFile($"FSM on: '{pickUpFsm.gameObject.name}'");
+                LogToFile($"HandEmpty: {handEmpty.Value}");
+                LogToFile($"pickedObject: '{(pickedObject.Value != null ? pickedObject.Value.name : "NULL")}'");
+                LogToFile($"inToolMode: {inToolMode}");
+
+                LogToFile("--- FSM Bool Variables ---");
+                foreach (var v in pickUpFsm.FsmVariables.BoolVariables)
+                {
+                    LogToFile($"  {v.Name} = {v.Value}");
+                }
+
+                LogToFile("--- FSM Float Variables ---");
+                foreach (var v in pickUpFsm.FsmVariables.FloatVariables)
+                {
+                    LogToFile($"  {v.Name} = {v.Value}");
+                }
+
+                LogToFile("--- FSM Int Variables ---");
+                foreach (var v in pickUpFsm.FsmVariables.IntVariables)
+                {
+                    LogToFile($"  {v.Name} = {v.Value}");
+                }
+
+                LogToFile("--- FSM GameObject Variables ---");
+                foreach (var v in pickUpFsm.FsmVariables.GameObjectVariables)
+                {
+                    LogToFile($"  {v.Name} = '{(v.Value != null ? v.Value.name : "NULL")}'");
+                }
+
+                LogToFile("--- FSM Vector3 Variables ---");
+                foreach (var v in pickUpFsm.FsmVariables.Vector3Variables)
+                {
+                    LogToFile($"  {v.Name} = {v.Value}");
+                }
+
+                LogToFile("--- All FSMs on PLAYER ---");
+                GameObject playerObj = GameObject.Find("PLAYER");
+                if (playerObj != null)
+                {
+                    foreach (PlayMakerFSM fsm in playerObj.GetComponentsInChildren<PlayMakerFSM>())
+                    {
+                        LogToFile($"  FSM: '{fsm.FsmName}'  state: '{fsm.ActiveStateName}'  on: '{fsm.gameObject.name}'");
+                    }
+                }
+
+                LogToFile("--- itemPivot ---");
+                LogToFile($"  childCount: {itemPivot.childCount}");
+                foreach (Transform child in itemPivot)
+                {
+                    LogToFile($"    child: '{child.name}'  layer={child.gameObject.layer}  active={child.gameObject.activeSelf}");
+                }
+
+                LogToFile("=== END DUMP ===");
+            }
         }
 
         private void ReleaseShiftHijack()
