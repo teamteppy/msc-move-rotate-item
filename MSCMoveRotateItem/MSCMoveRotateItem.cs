@@ -9,7 +9,7 @@ namespace MSCMoveRotateItem
         public override string ID => "MSCMoveRotateItem";
         public override string Name => "Move and Rotate Item";
         public override string Author => "teamteppy";
-        public override string Version => "1.0";
+        public override string Version => "1.1";
         public override string Description => "More rotation and movement with item pickup: Hold down Shift or Alt or Tab";
         public override Game SupportedGames => Game.MySummerCar;
 
@@ -64,16 +64,8 @@ namespace MSCMoveRotateItem
             SetupFunction(Setup.Update, Mod_Update);
             SetupFunction(Setup.ModSettings, Mod_Settings);
         }
-
-        private void LogToFile(string message)
-        {
-            string path = Application.persistentDataPath + "/MSCPauseMod_debug.txt";
-            System.IO.File.AppendAllText(path, message + "\n");
-        }
-
         private void Mod_Settings()
         {
-            debugKey = Keybind.Add("DebugKey", "Debug Game", KeyCode.Alpha9);
         }
 
         private void Mod_OnLoad()
@@ -230,7 +222,6 @@ namespace MSCMoveRotateItem
                 }
 
                 tabHijackedGO.transform.SetParent(fpsCamera.transform, true);
-                tabHijackedGO.layer = LayerMask.NameToLayer("Parts");
 
                 pickedObject.Value = null;
                 pickUpFsm.SendEvent("DROP_PART");
@@ -298,12 +289,6 @@ namespace MSCMoveRotateItem
                     itemPivot.position = tabItemWorldPosition;
                     tabHijackedGO.transform.position = tabItemWorldPosition;
                 }
-            }
-
-            if (debugKey.GetKeybindDown())
-            {
-                LogToFile($"tabHijackedGO layer: '{(tabHijackedGO != null ? tabHijackedGO.layer + " (" + LayerMask.LayerToName(tabHijackedGO.layer) + ")" : "NULL")}'");
-                LogToFile($"pickedObject layer: '{(pickedObject.Value != null ? pickedObject.Value.layer + " (" + LayerMask.LayerToName(pickedObject.Value.layer) + ")" : "NULL")}'");
             }
 
             shiftHeldLastFrame = shiftHeld;
