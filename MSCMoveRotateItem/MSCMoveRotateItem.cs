@@ -9,7 +9,7 @@ namespace MSCMoveRotateItem
         public override string ID => "MSCMoveRotateItem";
         public override string Name => "Move and Rotate Item";
         public override string Author => "teamteppy";
-        public override string Version => "1.1";
+        public override string Version => "1.2";
         public override string Description => "More rotation and movement with item pickup: Hold down Shift or Alt or Tab";
         public override Game SupportedGames => Game.MySummerCar;
 
@@ -42,9 +42,7 @@ namespace MSCMoveRotateItem
         private Vector3 tabHijackOrigin;
         private Vector3 tabItemWorldPosition;
         private float tabHeldSince = 0f;
-
         private int tabHijackedOriginalLayer;
-
 
         private const float TAB_MOUSE_SENSITIVITY = 0.05f;
         private const float TAB_CLAMP_RADIUS = 0.5f;
@@ -60,12 +58,13 @@ namespace MSCMoveRotateItem
         public override void ModSetup()
         {
             SetupFunction(Setup.OnLoad, Mod_OnLoad);
-            SetupFunction(Setup.OnGUI, Mod_OnGUI);
             SetupFunction(Setup.Update, Mod_Update);
             SetupFunction(Setup.ModSettings, Mod_Settings);
         }
+
         private void Mod_Settings()
         {
+            //debugKey = Keybind.Add("DebugKey", "Debug Log Item Name", KeyCode.Alpha9);
         }
 
         private void Mod_OnLoad()
@@ -97,12 +96,48 @@ namespace MSCMoveRotateItem
             itemPivot = player.transform.Find("Pivot/AnimPivot/Camera/FPSCamera/1Hand_Assemble/ItemPivot");
         }
 
-        private void Mod_OnGUI()
+        private void LogToFile(string message)
         {
+            string path = Application.persistentDataPath + "/MSCPauseMod_debug.txt";
+            System.IO.File.AppendAllText(path, message + "\n");
+        }
+
+        private bool IsAllowedItem(GameObject go)
+        {
+            int[] allowedLayers = new int[]
+            {
+                16,
+            };
+
+            foreach (int layer in allowedLayers)
+            {
+                if (go.layer == layer) { return true; }
+            }
+            return false;
         }
 
         private void Mod_Update()
         {
+            //if (debugKey.GetKeybindDown())
+            //{
+            //    if (pickedObject.Value != null)
+            //    {
+            //        GameObject obj = pickedObject.Value;
+            //        string info = "Held item name: " + obj.name + "\n"
+            //            + "  Layer: " + obj.layer + " (" + LayerMask.LayerToName(obj.layer) + ")\n"
+            //            + "  Tag: " + obj.tag + "\n"
+            //            + "  Position: " + obj.transform.position + "\n"
+            //            + "  Has Rigidbody: " + (obj.GetComponent<Rigidbody>() != null) + "\n"
+            //            + "  Is Kinematic: " + (obj.GetComponent<Rigidbody>() != null ? obj.GetComponent<Rigidbody>().isKinematic.ToString() : "N/A") + "\n"
+            //            + "  Parent: " + (obj.transform.parent != null ? obj.transform.parent.name : "None");
+            //        LogToFile(info);
+            //    }
+            //    else
+            //    {
+            //        LogToFile("No item currently held.");
+            //    }
+            //}
+
             bool inToolMode = pickUpFsm.gameObject.name != "Hand";
 
             bool shiftHeld = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
@@ -130,7 +165,7 @@ namespace MSCMoveRotateItem
                 shiftPendingRelease = false;
                 ReleaseShiftHijack();
             }
-            else if (!inToolMode && shiftHeld && Time.time - shiftHeldSince > MIN_HOLD_DURATION && scroll != 0f && !shiftHijacked && pickedObject != null && pickedObject.Value != null)
+            else if (!inToolMode && shiftHeld && Time.time - shiftHeldSince > MIN_HOLD_DURATION && scroll != 0f && !shiftHijacked && pickedObject != null && pickedObject.Value != null && IsAllowedItem(pickedObject.Value))
             {
                 hijackedGO = pickedObject.Value;
 
@@ -157,7 +192,7 @@ namespace MSCMoveRotateItem
                 altPendingRelease = false;
                 ReleaseAltHijack();
             }
-            else if (!inToolMode && altHeld && Time.time - altHeldSince > MIN_HOLD_DURATION && scroll != 0f && !altHijacked && pickedObject != null && pickedObject.Value != null)
+            else if (!inToolMode && altHeld && Time.time - altHeldSince > MIN_HOLD_DURATION && scroll != 0f && !altHijacked && pickedObject != null && pickedObject.Value != null && IsAllowedItem(pickedObject.Value))
             {
                 altHijackedGO = pickedObject.Value;
 
@@ -184,7 +219,7 @@ namespace MSCMoveRotateItem
                 middlePendingRelease = false;
                 ReleaseMiddleHijack();
             }
-            else if (!inToolMode && Input.GetMouseButtonDown(2) && !middleHijacked && Time.time - middleLastReleaseTime > MIDDLE_COOLDOWN && pickedObject != null && pickedObject.Value != null)
+            else if (!inToolMode && Input.GetMouseButtonDown(2) && !middleHijacked && Time.time - middleLastReleaseTime > MIDDLE_COOLDOWN && pickedObject != null && pickedObject.Value != null && IsAllowedItem(pickedObject.Value))
             {
                 middleHijackedGO = pickedObject.Value;
 
@@ -206,9 +241,10 @@ namespace MSCMoveRotateItem
                 middlePendingRelease = true;
             }
 
-            if (!inToolMode && tabHeld && Time.time - tabHeldSince > MIN_HOLD_DURATION && !tabHijacked && pickedObject != null && pickedObject.Value != null)
+            if (!inToolMode && tabHeld && Time.time - tabHeldSince > MIN_HOLD_DURATION && !tabHijacked && pickedObject != null && pickedObject.Value != null && IsAllowedItem(pickedObject.Value))
             {
                 tabHijackedGO = pickedObject.Value;
+                tabHijackedOriginalLayer = tabHijackedGO.layer;
 
                 tabHijackOrigin = new Vector3(tabHijackedGO.transform.position.x, 0f, tabHijackedGO.transform.position.z);
                 tabItemWorldPosition = new Vector3(tabHijackedGO.transform.position.x, tabHijackedGO.transform.position.y, tabHijackedGO.transform.position.z);
@@ -222,7 +258,6 @@ namespace MSCMoveRotateItem
                 }
 
                 tabHijackedGO.transform.SetParent(fpsCamera.transform, true);
-
                 pickedObject.Value = null;
                 pickUpFsm.SendEvent("DROP_PART");
                 tabHijacked = true;
