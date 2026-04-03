@@ -19,23 +19,25 @@ namespace MSCMoveRotateItem
         private Camera fpsCamera;
         private Transform itemPivot;
 
+        private const int RELEASE_FRAME_DELAY = 10;
+
         private GameObject hijackedGO;
         private bool shiftHijacked = false;
-        private bool shiftPendingRelease = false;
+        private int shiftPendingReleaseFrames = 0;
         private float shiftHeldSince = 0f;
 
         private GameObject altHijackedGO;
         private bool altHijacked = false;
-        private bool altPendingRelease = false;
+        private int altPendingReleaseFrames = 0;
         private float altHeldSince = 0f;
 
         private const float MIN_HOLD_DURATION = 0.1f;
 
         private GameObject middleHijackedGO;
         private bool middleHijacked = false;
-        private bool middlePendingRelease = false;
+        private int middlePendingReleaseFrames = 0;
         private float middleLastReleaseTime = 0f;
-        private const float MIDDLE_COOLDOWN = 2f;
+        private const float MIDDLE_COOLDOWN = 1.5f;
 
         private GameObject tabHijackedGO;
         private bool tabHijacked = false;
@@ -58,13 +60,14 @@ namespace MSCMoveRotateItem
         public override void ModSetup()
         {
             SetupFunction(Setup.OnLoad, Mod_OnLoad);
+            SetupFunction(Setup.OnGUI, Mod_OnGUI);
             SetupFunction(Setup.Update, Mod_Update);
             SetupFunction(Setup.ModSettings, Mod_Settings);
         }
 
         private void Mod_Settings()
         {
-            //debugKey = Keybind.Add("DebugKey", "Debug Log Item Name", KeyCode.Alpha9);
+            debugKey = Keybind.Add("DebugKey", "Debug Log Item Name", KeyCode.Alpha9);
         }
 
         private void Mod_OnLoad()
@@ -96,6 +99,10 @@ namespace MSCMoveRotateItem
             itemPivot = player.transform.Find("Pivot/AnimPivot/Camera/FPSCamera/1Hand_Assemble/ItemPivot");
         }
 
+        private void Mod_OnGUI()
+        {
+        }
+
         private void LogToFile(string message)
         {
             string path = Application.persistentDataPath + "/MSCPauseMod_debug.txt";
@@ -118,25 +125,36 @@ namespace MSCMoveRotateItem
 
         private void Mod_Update()
         {
-            //if (debugKey.GetKeybindDown())
-            //{
-            //    if (pickedObject.Value != null)
-            //    {
-            //        GameObject obj = pickedObject.Value;
-            //        string info = "Held item name: " + obj.name + "\n"
-            //            + "  Layer: " + obj.layer + " (" + LayerMask.LayerToName(obj.layer) + ")\n"
-            //            + "  Tag: " + obj.tag + "\n"
-            //            + "  Position: " + obj.transform.position + "\n"
-            //            + "  Has Rigidbody: " + (obj.GetComponent<Rigidbody>() != null) + "\n"
-            //            + "  Is Kinematic: " + (obj.GetComponent<Rigidbody>() != null ? obj.GetComponent<Rigidbody>().isKinematic.ToString() : "N/A") + "\n"
-            //            + "  Parent: " + (obj.transform.parent != null ? obj.transform.parent.name : "None");
-            //        LogToFile(info);
-            //    }
-            //    else
-            //    {
-            //        LogToFile("No item currently held.");
-            //    }
-            //}
+            if (debugKey.GetKeybindDown())
+            {
+                GameObject beerCase = GameObject.Find("beer case(itemx)");
+                if (beerCase != null)
+                {
+                    Rigidbody rb = beerCase.GetComponent<Rigidbody>();
+                    string info = "=== beer case(itemx) STATE ===\n"
+                        + "  Layer: " + beerCase.layer + " (" + LayerMask.LayerToName(beerCase.layer) + ")\n"
+                        + "  Tag: " + beerCase.tag + "\n"
+                        + "  Position: " + beerCase.transform.position + "\n"
+                        + "  Active: " + beerCase.activeSelf + "\n"
+                        + "  Parent: " + (beerCase.transform.parent != null ? beerCase.transform.parent.name : "None") + "\n"
+                        + "  Has Rigidbody: " + (rb != null) + "\n"
+                        + "  Is Kinematic: " + (rb != null ? rb.isKinematic.ToString() : "N/A") + "\n"
+                        + "  Velocity: " + (rb != null ? rb.velocity.ToString() : "N/A") + "\n"
+                        + "  shiftHijacked: " + shiftHijacked + "\n"
+                        + "  altHijacked: " + altHijacked + "\n"
+                        + "  middleHijacked: " + middleHijacked + "\n"
+                        + "  tabHijacked: " + tabHijacked + "\n"
+                        + "  shiftPendingReleaseFrames: " + shiftPendingReleaseFrames + "\n"
+                        + "  altPendingReleaseFrames: " + altPendingReleaseFrames + "\n"
+                        + "  FSM state: " + pickUpFsm.ActiveStateName + "\n"
+                        + "  pickedObject: " + (pickedObject.Value != null ? pickedObject.Value.name : "NULL");
+                    LogToFile(info);
+                }
+                else
+                {
+                    LogToFile("beer case(itemx) not found in scene.");
+                }
+            }
 
             bool inToolMode = pickUpFsm.gameObject.name != "Hand";
 
@@ -160,12 +178,16 @@ namespace MSCMoveRotateItem
                 tabHeldSince = Time.time;
             }
 
-            if (shiftPendingRelease)
+            // shift
+            if (shiftPendingReleaseFrames > 0)
             {
-                shiftPendingRelease = false;
-                ReleaseShiftHijack();
+                shiftPendingReleaseFrames--;
+                if (shiftPendingReleaseFrames == 0)
+                {
+                    ReleaseShiftHijack();
+                }
             }
-            else if (!inToolMode && shiftHeld && Time.time - shiftHeldSince > MIN_HOLD_DURATION && scroll != 0f && !shiftHijacked && pickedObject != null && pickedObject.Value != null && IsAllowedItem(pickedObject.Value))
+            else if (!inToolMode && shiftHeld && !shiftHijacked && shiftPendingReleaseFrames == 0 && Time.time - shiftHeldSince > MIN_HOLD_DURATION && pickedObject != null && pickedObject.Value != null && IsAllowedItem(pickedObject.Value))
             {
                 hijackedGO = pickedObject.Value;
 
@@ -182,17 +204,23 @@ namespace MSCMoveRotateItem
                 pickUpFsm.SendEvent("DROP_PART");
                 shiftHijacked = true;
             }
-            else if (shiftHijacked && !shiftHeld)
+
+            if (shiftHijacked && !shiftHeld && shiftPendingReleaseFrames == 0)
             {
-                shiftPendingRelease = true;
+                shiftPendingReleaseFrames = RELEASE_FRAME_DELAY;
+                shiftHeldSince = Time.time;
             }
 
-            if (altPendingRelease)
+            // alt
+            if (altPendingReleaseFrames > 0)
             {
-                altPendingRelease = false;
-                ReleaseAltHijack();
+                altPendingReleaseFrames--;
+                if (altPendingReleaseFrames == 0)
+                {
+                    ReleaseAltHijack();
+                }
             }
-            else if (!inToolMode && altHeld && Time.time - altHeldSince > MIN_HOLD_DURATION && scroll != 0f && !altHijacked && pickedObject != null && pickedObject.Value != null && IsAllowedItem(pickedObject.Value))
+            else if (!inToolMode && altHeld && !altHijacked && altPendingReleaseFrames == 0 && Time.time - altHeldSince > MIN_HOLD_DURATION && pickedObject != null && pickedObject.Value != null && IsAllowedItem(pickedObject.Value))
             {
                 altHijackedGO = pickedObject.Value;
 
@@ -209,17 +237,23 @@ namespace MSCMoveRotateItem
                 pickUpFsm.SendEvent("DROP_PART");
                 altHijacked = true;
             }
-            else if (altHijacked && !altHeld)
+
+            if (altHijacked && !altHeld && altPendingReleaseFrames == 0)
             {
-                altPendingRelease = true;
+                altPendingReleaseFrames = RELEASE_FRAME_DELAY;
+                altHeldSince = Time.time;
             }
 
-            if (middlePendingRelease)
+            // middle
+            if (middlePendingReleaseFrames > 0)
             {
-                middlePendingRelease = false;
-                ReleaseMiddleHijack();
+                middlePendingReleaseFrames--;
+                if (middlePendingReleaseFrames == 0)
+                {
+                    ReleaseMiddleHijack();
+                }
             }
-            else if (!inToolMode && Input.GetMouseButtonDown(2) && !middleHijacked && Time.time - middleLastReleaseTime > MIDDLE_COOLDOWN && pickedObject != null && pickedObject.Value != null && IsAllowedItem(pickedObject.Value))
+            else if (!inToolMode && Input.GetMouseButtonDown(2) && middlePendingReleaseFrames == 0 && !middleHijacked && Time.time - middleLastReleaseTime > MIDDLE_COOLDOWN && pickedObject != null && pickedObject.Value != null && IsAllowedItem(pickedObject.Value))
             {
                 middleHijackedGO = pickedObject.Value;
 
@@ -236,11 +270,13 @@ namespace MSCMoveRotateItem
                 pickUpFsm.SendEvent("DROP_PART");
                 middleHijacked = true;
             }
-            else if (middleHijacked && Input.GetMouseButtonUp(2))
+
+            if (middleHijacked && !Input.GetMouseButton(2) && middlePendingReleaseFrames == 0)
             {
-                middlePendingRelease = true;
+                middlePendingReleaseFrames = RELEASE_FRAME_DELAY;
             }
 
+            // tab
             if (!inToolMode && tabHeld && Time.time - tabHeldSince > MIN_HOLD_DURATION && !tabHijacked && pickedObject != null && pickedObject.Value != null && IsAllowedItem(pickedObject.Value))
             {
                 tabHijackedGO = pickedObject.Value;
@@ -351,6 +387,7 @@ namespace MSCMoveRotateItem
                 rb.angularVelocity = Vector3.zero;
             }
 
+            LogToFile($"ReleaseShiftHijack: FSM state before FINISHED: '{pickUpFsm.ActiveStateName}'");
             pickUpFsm.SendEvent("FINISHED");
 
             hijackedGO = null;
@@ -377,6 +414,7 @@ namespace MSCMoveRotateItem
                 rb.angularVelocity = Vector3.zero;
             }
 
+            LogToFile($"ReleaseAltHijack: FSM state before FINISHED: '{pickUpFsm.ActiveStateName}'");
             pickUpFsm.SendEvent("FINISHED");
 
             altHijackedGO = null;
@@ -403,6 +441,7 @@ namespace MSCMoveRotateItem
                 rb.angularVelocity = Vector3.zero;
             }
 
+            LogToFile($"ReleaseMiddleHijack: FSM state before FINISHED: '{pickUpFsm.ActiveStateName}'");
             pickUpFsm.SendEvent("FINISHED");
 
             middleLastReleaseTime = Time.time;
