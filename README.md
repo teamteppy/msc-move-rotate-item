@@ -4,4 +4,4 @@ This was so hard to get working without bugs you have no idea none of you have a
 yet I continue
 
 [View MSC Mod Page](https://www.nexusmods.com/mysummercar/mods/10781)
-[View MWC Mod Page]([https://www.nexusmods.com/mysummercar/mods/10781](https://www.nexusmods.com/mywintercar/mods/1982))
+[View MWC Mod Page](https://www.nexusmods.com/mywintercar/mods/1982)
