@@ -1,5 +1,6 @@
 ﻿using HutongGames.PlayMaker;
 using MSCLoader;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace MSCMoveRotateItem
@@ -60,15 +61,14 @@ namespace MSCMoveRotateItem
         public override void ModSetup()
         {
             SetupFunction(Setup.OnLoad, Mod_OnLoad);
-            SetupFunction(Setup.OnGUI, Mod_OnGUI);
             SetupFunction(Setup.Update, Mod_Update);
-            SetupFunction(Setup.ModSettings, Mod_Settings);
+            //SetupFunction(Setup.ModSettings, Mod_Settings);
         }
 
-        private void Mod_Settings()
-        {
-            debugKey = Keybind.Add("DebugKey", "Debug Log Item Name", KeyCode.Alpha9);
-        }
+        //private void Mod_Settings()
+        //{
+        //    debugKey = Keybind.Add("DebugKey", "Debug Log Item Name", KeyCode.Alpha9);
+        //}
 
         private void Mod_OnLoad()
         {
@@ -99,15 +99,11 @@ namespace MSCMoveRotateItem
             itemPivot = player.transform.Find("Pivot/AnimPivot/Camera/FPSCamera/1Hand_Assemble/ItemPivot");
         }
 
-        private void Mod_OnGUI()
-        {
-        }
-
-        private void LogToFile(string message)
-        {
-            string path = Application.persistentDataPath + "/MSCPauseMod_debug.txt";
-            System.IO.File.AppendAllText(path, message + "\n");
-        }
+        //private void LogToFile(string message)
+        //{
+        //    string path = Application.persistentDataPath + "/MSCPauseMod_debug.txt";
+        //    System.IO.File.AppendAllText(path, message + "\n");
+        //}
 
         private bool IsAllowedItem(GameObject go)
         {
@@ -125,45 +121,39 @@ namespace MSCMoveRotateItem
 
         private void Mod_Update()
         {
-            if (debugKey.GetKeybindDown())
+            // As soon as the player tries to CLICK during the mod rotations, abort everything to prevent bugs with engine combine/multi-item pickup!
+            if ((shiftHijacked || altHijacked || middleHijacked) && Input.GetMouseButtonDown(0))
             {
-                string[] itemNames = new string[]
-                {
-                    "Engine Block(VINX0)",
-                    "Crankshaft(VINXX)",
-                };
-
-                foreach (string itemName in itemNames)
-                {
-                    GameObject item = GameObject.Find(itemName);
-                    if (item != null)
-                    {
-                        Rigidbody rb = item.GetComponent<Rigidbody>();
-                        string info = "=== " + itemName + " STATE ===\n"
-                            + "  Layer: " + item.layer + " (" + LayerMask.LayerToName(item.layer) + ")\n"
-                            + "  Tag: " + item.tag + "\n"
-                            + "  Position: " + item.transform.position + "\n"
-                            + "  Active: " + item.activeSelf + "\n"
-                            + "  Parent: " + (item.transform.parent != null ? item.transform.parent.name : "None") + "\n"
-                            + "  Has Rigidbody: " + (rb != null) + "\n"
-                            + "  Is Kinematic: " + (rb != null ? rb.isKinematic.ToString() : "N/A") + "\n"
-                            + "  Velocity: " + (rb != null ? rb.velocity.ToString() : "N/A") + "\n"
-                            + "  shiftHijacked: " + shiftHijacked + "\n"
-                            + "  altHijacked: " + altHijacked + "\n"
-                            + "  middleHijacked: " + middleHijacked + "\n"
-                            + "  tabHijacked: " + tabHijacked + "\n"
-                            + "  shiftPendingReleaseFrames: " + shiftPendingReleaseFrames + "\n"
-                            + "  altPendingReleaseFrames: " + altPendingReleaseFrames + "\n"
-                            + "  FSM state: " + pickUpFsm.ActiveStateName + "\n"
-                            + "  pickedObject: " + (pickedObject.Value != null ? pickedObject.Value.name : "NULL");
-                        LogToFile(info);
-                    }
-                    else
-                    {
-                        LogToFile("=== " + itemName + " not found in scene. ===");
-                    }
-                }
+                if (shiftHijacked) { ReleaseShiftHijack(); shiftPendingReleaseFrames = 0; }
+                if (altHijacked) { ReleaseAltHijack(); altPendingReleaseFrames = 0; }
+                if (middleHijacked) { ReleaseMiddleHijack(); middlePendingReleaseFrames = 0; }
+                return;
             }
+
+            //if (debugKey.GetKeybindDown())
+            //{
+            //    LogToFile("--- All player FSM variable snapshot ---");
+            //    GameObject playerObj = GameObject.Find("PLAYER");
+            //    if (playerObj != null)
+            //    {
+            //        foreach (PlayMakerFSM fsm in playerObj.GetComponentsInChildren<PlayMakerFSM>())
+            //        {
+            //            LogToFile($"  FSM: '{fsm.FsmName}' on '{fsm.gameObject.name}' state: '{fsm.ActiveStateName}'");
+            //            foreach (var v in fsm.FsmVariables.BoolVariables)
+            //            {
+            //                LogToFile($"    Bool: {v.Name} = {v.Value}");
+            //            }
+            //            foreach (var v in fsm.FsmVariables.GameObjectVariables)
+            //            {
+            //                LogToFile($"    GO: {v.Name} = '{(v.Value != null ? v.Value.name : "NULL")}'");
+            //            }
+            //            foreach (var v in fsm.FsmVariables.IntVariables)
+            //            {
+            //                LogToFile($"    Int: {v.Name} = {v.Value}");
+            //            }
+            //        }
+            //    }
+            //}
 
             bool inToolMode = pickUpFsm.gameObject.name != "Hand";
 
@@ -187,6 +177,7 @@ namespace MSCMoveRotateItem
                 tabHeldSince = Time.time;
             }
 
+            // the below 3 are for when the game has "snatched" an item away from you, like when you combine two engine pieces together
             if (shiftHijacked && hijackedGO != null && pickedObject.Value != null && pickedObject.Value != hijackedGO)
             {
                 hijackedGO.layer = LayerMask.NameToLayer("Parts");
@@ -202,9 +193,9 @@ namespace MSCMoveRotateItem
                 altHijackedGO.layer = LayerMask.NameToLayer("Parts");
                 pickUpFsm.SendEvent("DROP_PART");
                 altHijackedGO = null;
-                shiftHijacked = false;
-                shiftPendingReleaseFrames = 0;
-                shiftHeldSince = Time.time;
+                altHijacked = false;
+                altPendingReleaseFrames = 0;
+                altHeldSince = Time.time;
             }
 
             if (middleHijacked && middleHijackedGO != null && pickedObject.Value != null && pickedObject.Value != middleHijackedGO)
@@ -212,9 +203,8 @@ namespace MSCMoveRotateItem
                 middleHijackedGO.layer = LayerMask.NameToLayer("Parts");
                 pickUpFsm.SendEvent("DROP_PART");
                 middleHijackedGO = null;
-                shiftHijacked = false;
-                shiftPendingReleaseFrames = 0;
-                shiftHeldSince = Time.time;
+                middleHijacked = false;
+                middlePendingReleaseFrames = 0;
             }
 
             // shift
@@ -246,7 +236,6 @@ namespace MSCMoveRotateItem
 
             if (shiftHijacked && !shiftHeld && shiftPendingReleaseFrames == 0)
             {
-                LogToFile("Weird");
                 shiftPendingReleaseFrames = RELEASE_FRAME_DELAY;
                 shiftHeldSince = Time.time;
             }
@@ -402,11 +391,11 @@ namespace MSCMoveRotateItem
                 }
             }
 
-            // don't let the player pick up anything else while we are hijacking
-            if (shiftHijacked || altHijacked || middleHijacked || tabHijacked)
-            {
-                raycastHitObject.Value = null;
-            }
+            //if (shiftHijacked || altHijacked || middleHijacked || tabHijacked)
+            //{
+            //    raycastHitObject.Value = null;
+            //    handEmpty.Value = false;
+            //}
 
             shiftHeldLastFrame = shiftHeld;
             altHeldLastFrame = altHeld;
@@ -417,23 +406,22 @@ namespace MSCMoveRotateItem
         {
             if (hijackedGO == null) { return; }
 
-            if (pickedObject.Value != null && pickedObject.Value != hijackedGO)
-            {
-            }
-            else
-            {
-                LogToFile("1");
-                // normal release
-                hijackedGO.transform.SetParent(itemPivot, true);
-                hijackedGO.transform.localPosition = Vector3.zero;
-                pickedObject.Value = hijackedGO;
-                raycastHitObject.Value = hijackedGO;
-                handEmpty.Value = false;
-                lenght.Value = hijackedGO.name.Length;
-                Rigidbody rb = hijackedGO.GetComponent<Rigidbody>();
-                if (rb != null) { rb.isKinematic = false; rb.velocity = Vector3.zero; rb.angularVelocity = Vector3.zero; }
-                pickUpFsm.SendEvent("FINISHED");
-            }
+            //if (pickedObject.Value != null && pickedObject.Value != hijackedGO)
+            //{
+            //}
+            //else
+            //{
+            // normal release
+            hijackedGO.transform.SetParent(itemPivot, true);
+            hijackedGO.transform.localPosition = Vector3.zero;
+            pickedObject.Value = hijackedGO;
+            raycastHitObject.Value = hijackedGO;
+            handEmpty.Value = false;
+            lenght.Value = hijackedGO.name.Length;
+            Rigidbody rb = hijackedGO.GetComponent<Rigidbody>();
+            if (rb != null) { rb.isKinematic = false; rb.velocity = Vector3.zero; rb.angularVelocity = Vector3.zero; }
+            pickUpFsm.SendEvent("FINISHED");
+            //}
 
             hijackedGO = null;
             shiftHijacked = false;
@@ -459,7 +447,6 @@ namespace MSCMoveRotateItem
                 rb.angularVelocity = Vector3.zero;
             }
 
-            LogToFile($"ReleaseAltHijack: FSM state before FINISHED: '{pickUpFsm.ActiveStateName}'");
             pickUpFsm.SendEvent("FINISHED");
 
             altHijackedGO = null;
@@ -486,7 +473,6 @@ namespace MSCMoveRotateItem
                 rb.angularVelocity = Vector3.zero;
             }
 
-            LogToFile($"ReleaseMiddleHijack: FSM state before FINISHED: '{pickUpFsm.ActiveStateName}'");
             pickUpFsm.SendEvent("FINISHED");
 
             middleLastReleaseTime = Time.time;
